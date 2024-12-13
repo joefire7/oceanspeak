@@ -4,6 +4,7 @@ class OceanSpeakGame extends Phaser.Scene {
     private fishGroup!: Phaser.Physics.Arcade.Group;
     private socket!: WebSocket;
     private fpsText!: Phaser.GameObjects.Text;
+    private timeElapsed: number = 0;
 
     constructor() {
         super({ key: 'FishGame' });
@@ -92,15 +93,19 @@ class OceanSpeakGame extends Phaser.Scene {
         };
     }
 
-    update(): void {
+    update(time: number, delta: number): void {
+        // Accumulate time smoothly using delta
+        this.timeElapsed += delta;
+    
         // Update the FPS counter
         const fps = Math.round(this.game.loop.actualFps);
         this.fpsText.setText(`FPS: ${fps}`);
-        
-        // Animate smooth swimming for all fish
+    
+         // Animate smooth swimming for all fish
         this.fishGroup.children.iterate((fish) => {
         const fishSprite = fish as Phaser.Physics.Arcade.Sprite;
-        fishSprite.y += Math.sin((this.time.now + fishSprite.x * 100) / 3000) * 5; // Slow and smooth sine wave
+        const baseY = fishSprite.getData('baseY') || fishSprite.y; // Retrieve or default to current Y
+        fishSprite.y = baseY + Math.sin((this.time.now + fishSprite.x * 100) / 3000) * 10; // Smooth sine wave
         return true; // Explicitly return true to satisfy TypeScript
     });
     }
@@ -119,21 +124,17 @@ class OceanSpeakGame extends Phaser.Scene {
         fishes.forEach((fishData) => {
             const fishName = fishData.id.toString();
             if (existingFish.has(fishName)) {
-                // Interpolate positions for existing fish
+                // Update position for existing fish
                 const fishSprite = existingFish.get(fishName) as Phaser.Physics.Arcade.Sprite;
-                this.tweens.add({
-                    targets: fishSprite,
-                    x: fishData.x,
-                    y: fishData.y,
-                    duration: 500, // Smooth transition over 500ms
-                    ease: 'Linear',
-                });
+                fishSprite.setData('baseY', fishSprite.getData('baseY') || fishData.y); // Ensure baseY is set
+                fishSprite.setPosition(fishData.x, fishData.y);
                 existingFish.delete(fishName);
             } else {
                 // Add new fish
                 const fish = this.fishGroup.create(fishData.x, fishData.y, 'fish').setInteractive();
                 fish.name = fishName;
                 fish.setScale(0.5);
+                fish.setData('baseY', fishData.y); // Set baseY for sine wave animation
     
                 fish.on('pointerdown', () => {
                     fish.disableInteractive();
@@ -167,6 +168,8 @@ class OceanSpeakGame extends Phaser.Scene {
             this.fishGroup.remove(fish, true, true);
         });
     }
+    
+    
     
 }
 
