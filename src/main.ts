@@ -17,6 +17,9 @@ class OceanSpeakGame extends Phaser.Scene {
         this.load.image('sandBottom', 'assets/sandTile2.png'); // Bottom sand tile
         this.load.image('resetButton', 'assets/resetButton.png');
         this.load.image('bubble', 'assets/bubble.png'); // Ensure this path is correct
+        this.load.image('seaweed', 'assets/fishTile_052.png');  // Load the seaweed asset
+        this.load.image('seaweed2', 'assets/fishTile_032.png');  // Load the seaweed asset
+        this.load.image('seaweed3', 'assets/fishTile_033.png');  // Load the seaweed asset
     }
 
     create(): void {
@@ -24,6 +27,7 @@ class OceanSpeakGame extends Phaser.Scene {
         const background = this.add.image(0, 0, 'waterBackground');
         background.setOrigin(0, 0);
         background.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
+        background.setDepth(-2);
 
         // Create the FPS text
         this.fpsText = this.add.text(10, 10, 'FPS: 0', {
@@ -92,6 +96,67 @@ class OceanSpeakGame extends Phaser.Scene {
                 this.syncFish(data.fishes);
             }
         };
+
+         // Add the seaweed to the scene
+        const seaweed_1 = this.add.image(400, 300, 'seaweed');
+        seaweed_1.setOrigin(0.5, -0.5); // Set the origin at the bottom center to pivot correctly
+        seaweed_1.setScale(1); // Adjust scale if needed
+        seaweed_1.setDepth(-1);
+
+        // Create a waving animation using a tween
+        this.tweens.add({
+            targets: seaweed_1,
+            angle: { from: -5, to: 5 }, // Oscillate the angle for the sway effect
+            duration: 5000, // Time for a complete wave (in ms)
+            ease: 'Sine.easeInOut', // Smooth wave motion
+            yoyo: true, // Reverse the animation back and forth
+            repeat: -1, // Repeat infinitely
+        });
+
+        const seaweed_2 = this.add.image(400, 300, 'seaweed');
+        seaweed_2.setOrigin(-1, -0.6); // Set the origin at the bottom center to pivot correctly
+        seaweed_2.setScale(1); // Adjust scale if needed
+        seaweed_2.setDepth(-1);
+
+        // Create a waving animation using a tween
+        this.tweens.add({
+            targets: seaweed_2,
+            angle: { from: -6, to: 6 }, // Oscillate the angle for the sway effect
+            duration: 4200, // Time for a complete wave (in ms)
+            ease: 'Sine.easeInOut', // Smooth wave motion
+            yoyo: true, // Reverse the animation back and forth
+            repeat: -1, // Repeat infinitely
+        });
+
+        const seaweed_3 = this.add.image(400, 300, 'seaweed2');
+        seaweed_3.setOrigin(2, -1); // Set the origin at the bottom center to pivot correctly
+        seaweed_3.setScale(0.8); // Adjust scale if needed
+        seaweed_3.setDepth(-1);
+
+        // Create a waving animation using a tween
+        this.tweens.add({
+            targets: seaweed_3,
+            angle: { from: -4, to: 4 }, // Oscillate the angle for the sway effect
+            duration: 1700, // Time for a complete wave (in ms)
+            ease: 'Sine.easeInOut', // Smooth wave motion
+            yoyo: true, // Reverse the animation back and forth
+            repeat: -1, // Repeat infinitely
+        });
+
+        const seaweed_4 = this.add.image(400, 300, 'seaweed3');
+        seaweed_4.setOrigin(3, -0.70); // Set the origin at the bottom center to pivot correctly
+        seaweed_4.setScale(1); // Adjust scale if needed
+        seaweed_4.setDepth(-1);
+
+        // Create a waving animation using a tween
+        this.tweens.add({
+            targets: seaweed_4,
+            angle: { from: -4, to: 4 }, // Oscillate the angle for the sway effect
+            duration: 1700, // Time for a complete wave (in ms)
+            ease: 'Sine.easeInOut', // Smooth wave motion
+            yoyo: true, // Reverse the animation back and forth
+            repeat: -1, // Repeat infinitely
+        });
     }
 
     update(time: number, delta: number): void {
