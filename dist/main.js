@@ -10,6 +10,7 @@ class OceanSpeakGame extends Phaser.Scene {
         this.load.image('sandTop', 'assets/sandTile.png'); // / Top sand tile
         this.load.image('sandBottom', 'assets/sandTile2.png'); // Bottom sand tile
         this.load.image('resetButton', 'assets/resetButton.png');
+        this.load.image('bubble', 'assets/bubble.png'); // Ensure this path is correct
     }
     create() {
         // Add the water background
@@ -100,7 +101,10 @@ class OceanSpeakGame extends Phaser.Scene {
                 fish.name = fishName;
                 fish.setScale(0.5);
                 fish.setData('baseY', fishData.y); // Set baseY for sine wave animation
-                fish.on('pointerdown', () => {
+                fish.on('pointerdown', (pointer) => {
+                    // Use current client-side position
+                    // const fishX = fish.x;
+                    // const fishY = fish.y;
                     fish.disableInteractive();
                     this.tweens.add({
                         targets: fish,
@@ -116,6 +120,9 @@ class OceanSpeakGame extends Phaser.Scene {
                                 alpha: 0,
                                 duration: 100,
                                 onComplete: () => {
+                                    // Use the pointer's x and y for the bubble effect
+                                    this.createBubbleEffect(pointer.x, pointer.y, pointer);
+                                    console.log("Pointer x: " + pointer.x + " " + "Pointer y: " + pointer.y);
                                     fish.destroy();
                                     this.socket.send(JSON.stringify({ type: 'fishDestroyed', id: parseInt(fish.name) }));
                                 },
@@ -127,7 +134,29 @@ class OceanSpeakGame extends Phaser.Scene {
         });
         // Remove leftover fish
         existingFish.forEach((fish) => {
-            this.fishGroup.remove(fish, true, true);
+            const fishSprite = fish;
+            console.log(`Removing fish and creating bubbles at (${fishSprite.x}, ${fishSprite.y})`); // Debugging log
+            //this.createBubbleEffect(fishSprite.x, fishSprite.y); // Create bubble effect before removing
+            this.fishGroup.remove(fishSprite, true, true);
+        });
+    }
+    createBubbleEffect(x, y, pointer) {
+        const particles = this.add.particles(x, y, 'bubble', {
+            x: pointer.deltaX,
+            y: pointer.deltaY,
+            speed: { min: 50, max: 100 },
+            scale: { start: 2.5, end: 0 },
+            lifespan: 1000,
+            quantity: 20,
+            frequency: -1, // Emit all particles at once
+        }); // Updated to pass position directly
+        // Set the emitter's position to the fish's position
+        //particles.setPosition(x,y);
+        // Trigger the burst effect
+        particles.explode(10, pointer.deltaX, pointer.deltaY);
+        // Destroy the particle system after a short time
+        this.time.delayedCall(1000, () => {
+            particles.destroy();
         });
     }
 }
