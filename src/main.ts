@@ -1,10 +1,26 @@
 import Phaser from "phaser";
+import {PlantGrowthComponent} from "./PlantGrowthComponent";
+import {PlantGrowthState} from "./PlantGrowthComponent";
+
 
 class OceanSpeakGame extends Phaser.Scene {
     private fishGroup!: Phaser.Physics.Arcade.Group;
     private socket!: WebSocket;
     private fpsText!: Phaser.GameObjects.Text;
     private timeElapsed: number = 0;
+
+    private plantGrowthSystem!: PlantGrowthComponent;
+    private currentPlantStateIndex: number = 0;
+    private plantStates: PlantGrowthState[] = [
+        PlantGrowthState.Seed,
+        PlantGrowthState.Growth1,
+        PlantGrowthState.Growth2,
+        PlantGrowthState.Growth3,
+        PlantGrowthState.FullyGrown,
+    ];
+    
+    private speechRecognition!: SpeechRecognition;
+
 
     constructor() {
         super({ key: 'FishGame' });
@@ -16,10 +32,17 @@ class OceanSpeakGame extends Phaser.Scene {
         this.load.image('sandTop', 'assets/sandTile.png'); // / Top sand tile
         this.load.image('sandBottom', 'assets/sandTile2.png'); // Bottom sand tile
         this.load.image('resetButton', 'assets/resetButton.png');
+        this.load.image('speakButton','assets/speakButton.png');
         this.load.image('bubble', 'assets/bubble.png'); // Ensure this path is correct
         this.load.image('seaweed', 'assets/fishTile_052.png');  // Load the seaweed asset
         this.load.image('seaweed2', 'assets/fishTile_032.png');  // Load the seaweed asset
         this.load.image('seaweed3', 'assets/fishTile_033.png');  // Load the seaweed asset
+         // Load images for all growth states
+         this.load.image('seed', 'assets/seed.png');
+         this.load.image('growth1', 'assets/growth1.png');
+         this.load.image('growth2', 'assets/growth2.png');
+         this.load.image('growth3', 'assets/growth3.png');
+         this.load.image('fullyGrown', 'assets/fullyGrown.png');
     }
 
     create(): void {
@@ -73,6 +96,16 @@ class OceanSpeakGame extends Phaser.Scene {
         resetButton.on('pointerdown', () => {
             this.socket.send(JSON.stringify({type: 'resetFish'}));
             console.log('Reset button clicked. Sent resetFish to server.');
+        });
+
+        // Add Speak Button
+        const speakButton = this.add.image(this.cameras.main.width / 3, 30, 'speakButton')
+        speakButton.setInteractive();
+        speakButton.setScale(0.1); // Adjust Button size
+
+        speakButton.on('pointerdown', () => {
+            this.initSpeechRecognition();
+            console.log('Speak button clicked. Now the child need to speak.');
         });
         
 
@@ -157,6 +190,10 @@ class OceanSpeakGame extends Phaser.Scene {
             yoyo: true, // Reverse the animation back and forth
             repeat: -1, // Repeat infinitely
         });
+
+        // Initialize the Plant Growth System
+        this.plantGrowthSystem = new PlantGrowthComponent(this, 0, 0);
+        this.plantGrowthSystem.changeState(PlantGrowthState.Seed);
     }
 
     update(time: number, delta: number): void {
@@ -265,6 +302,91 @@ class OceanSpeakGame extends Phaser.Scene {
             particles.destroy();
         });
     }
+
+    private initSpeechRecognition(): void {
+        
+        const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            console.error('SpeechRecognition API is not supported in this browser.');
+            return;
+        }
+
+        // if (SpeechRecognition) {
+        //     const recognition = new SpeechRecognition();
+        
+        //     navigator.languages.forEach((lang) => {
+        //         recognition.lang = lang;
+        //         console.log(`Testing language: ${lang}`);
+        
+        //         recognition.onerror = (event) => {
+        //             if (event.error === 'language-not-supported') {
+        //                 console.log(`Language not supported: ${lang}`);
+        //             }
+        //         };
+        
+        //         recognition.onstart = () => {
+        //             console.log(`Language supported: ${lang}`);
+        //             recognition.stop();
+        //         };
+        
+        //         recognition.start();
+        //     });
+        // } else {
+        //     console.error('SpeechRecognition API is not supported in this browser.');
+        // }
+        
+         // Initialize SpeechRecognition
+    this.speechRecognition = new SpeechRecognition();
+    this.speechRecognition.continuous = true; // Keep listening continuously
+    this.speechRecognition.interimResults = false; // Only final results
+    this.speechRecognition.lang = 'en'; // Set to English (United States)
+
+
+    // Start the recognition process
+    this.speechRecognition.start();
+
+    // Handle the result event
+    this.speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        console.log(`You said: ${transcript}`);
+
+        if (transcript.includes('grow')) {
+            console.log('Grow command detected!');
+            this.growPlant(); // Trigger the plant growth system
+        }
+    };
+
+    // Handle errors
+    this.speechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error(`Speech recognition error: ${event.error}`);
+        if (event.error === 'language-not-supported') {
+            console.log('The selected language is not supported. Stopping recognition.');
+            this.speechRecognition.stop();
+        }
+    };
+    
+    // Restart on end
+    this.speechRecognition.onend = () => {
+        console.log('Speech recognition ended. Restarting...');
+        this.speechRecognition.start();
+    };
+        
+
+    }
+
+    private growPlant(): void {
+        // Check if there is a next growth state
+        if (this.currentPlantStateIndex < this.plantStates.length) {
+            const nextState = this.plantStates[this.currentPlantStateIndex];
+            this.plantGrowthSystem.changeState(nextState);
+            this.currentPlantStateIndex++;
+        } else {
+            console.log('Plant is fully grown!');
+        }
+    }
+
+
 }
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -279,6 +401,8 @@ const config: Phaser.Types.Core.GameConfig = {
         },
     },
     scene: OceanSpeakGame,
+    pixelArt: true, // Enable pixel-perfect rendering
+    antialias: true, // Disable anti-aliasing
 };
 
 const game = new Phaser.Game(config);
