@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { PlantGrowthComponent } from "./PlantGrowthComponent";
 import { PlantGrowthState } from "./PlantGrowthComponent";
+import { SceneManager } from './SceneManager';
 class OceanSpeakGame extends Phaser.Scene {
     constructor() {
         super({ key: 'FishGame' });
@@ -35,11 +36,6 @@ class OceanSpeakGame extends Phaser.Scene {
         this.load.image('rockObstacle', 'assets/rockObstacle.png');
     }
     create() {
-        // Add the water background
-        const background = this.add.image(0, 0, 'waterBackground');
-        background.setOrigin(0, 0);
-        background.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
-        background.setDepth(-2);
         // Create the FPS text
         this.fpsText = this.add.text(10, 10, 'FPS: 0', {
             font: '16px Arial',
@@ -47,35 +43,6 @@ class OceanSpeakGame extends Phaser.Scene {
         });
         this.fpsText.setDepth(1);
         this.cameras.main.setRoundPixels(true);
-        // Add the tiled sand texture at the bottom using TileSprite
-        /*   const tileHeight = 128;
-          const startY = this.cameras.main.height - tileHeight; // Position at the bottom */
-        // Add the sand tiles at the bottom using TileSprites
-        const tileHeight = 64;
-        const startYBottom = this.cameras.main.height - tileHeight; // Position at the bottom
-        const startYAboveBottom = this.cameras.main.height - 2 * tileHeight; // Position right above the bottom tile
-        // Bottom sand
-        const sandBottomSprite = this.add.tileSprite(0, startYBottom, this.cameras.main.width, tileHeight, 'sandBottom');
-        sandBottomSprite.setOrigin(0, 0);
-        // Top sand (above bottom sand)
-        const sandTopSprite = this.add.tileSprite(0, startYAboveBottom, this.cameras.main.width, tileHeight, 'sandTop');
-        sandTopSprite.setOrigin(0, 0);
-        // Add Reset Button
-        const resetButton = this.add.image(this.cameras.main.width / 2, 30, 'resetButton');
-        resetButton.setInteractive();
-        resetButton.setScale(0.1); // Adjust Button size
-        resetButton.on('pointerdown', () => {
-            this.socket.send(JSON.stringify({ type: 'resetFish' }));
-            console.log('Reset button clicked. Sent resetFish to server.');
-        });
-        // Add Speak Button
-        const speakButton = this.add.image(this.cameras.main.width / 3, 30, 'speakButton');
-        speakButton.setInteractive();
-        speakButton.setScale(0.1); // Adjust Button size
-        speakButton.on('pointerdown', () => {
-            this.initSpeechRecognition();
-            console.log('Speak button clicked. Now the child need to speak.');
-        });
         // Initialize the fish group
         this.fishGroup = this.physics.add.group();
         console.log('Fish group initialized.');
@@ -94,78 +61,27 @@ class OceanSpeakGame extends Phaser.Scene {
                 this.syncFish(data.fishes);
             }
         };
-        // Add the seaweed to the scene
-        const seaweed_1 = this.add.image(400, 300, 'seaweed');
-        seaweed_1.setOrigin(0.5, -0.5); // Set the origin at the bottom center to pivot correctly
-        seaweed_1.setCrop(0, 1, seaweed_1.width, seaweed_1.height - 1);
-        seaweed_1.setScale(1); // Adjust scale if needed
-        seaweed_1.setDepth(-1);
-        // Create a waving animation using a tween
-        this.tweens.add({
-            targets: seaweed_1,
-            angle: { from: -5, to: 5 },
-            duration: 5000,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1, // Repeat infinitely
+        const sceneManager = new SceneManager(this);
+        // Background
+        sceneManager.createBackground('waterBackground');
+        // Sand Layers
+        sceneManager.createSandLayer('sandBottom', this.cameras.main.height - 64);
+        sceneManager.createSandLayer('sandTop', this.cameras.main.height - 128);
+        // Buttons
+        sceneManager.createButton('resetButton', this.cameras.main.width / 2, 30, 0.1, () => {
+            this.socket.send(JSON.stringify({ type: 'resetFish' }));
+            console.log('Reset button clicked');
         });
-        const seaweed_2 = this.add.image(400, 300, 'seaweed');
-        seaweed_2.setOrigin(-1, -0.6); // Set the origin at the bottom center to pivot correctly
-        seaweed_2.setCrop(0, 1, seaweed_2.width, seaweed_2.height - 1);
-        seaweed_2.setScale(1); // Adjust scale if needed
-        seaweed_2.setDepth(-1);
-        // Create a waving animation using a tween
-        this.tweens.add({
-            targets: seaweed_2,
-            angle: { from: -6, to: 6 },
-            duration: 4200,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1, // Repeat infinitely
+        sceneManager.createButton('speakButton', this.cameras.main.width / 3, 30, 0.1, () => {
+            this.initSpeechRecognition();
+            console.log('Speak button clicked');
         });
-        const seaweed_3 = this.add.image(400, 300, 'seaweed2');
-        seaweed_3.setOrigin(2, -1); // Set the origin at the bottom center to pivot correctly
-        seaweed_3.setCrop(0, 1, seaweed_3.width, seaweed_3.height - 1);
-        seaweed_3.setScale(0.8); // Adjust scale if needed
-        seaweed_3.setDepth(-1);
-        // Create a waving animation using a tween
-        this.tweens.add({
-            targets: seaweed_3,
-            angle: { from: -4, to: 4 },
-            duration: 1700,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1, // Repeat infinitely
-        });
-        const seaweed_4 = this.add.image(400, 300, 'seaweed3');
-        seaweed_4.setOrigin(3, -0.70); // Set the origin at the bottom center to pivot correctly
-        seaweed_4.setCrop(0, 1, seaweed_4.width, seaweed_4.height - 1);
-        seaweed_4.setScale(1); // Adjust scale if needed
-        seaweed_4.setDepth(-1);
-        // Create a waving animation using a tween
-        this.tweens.add({
-            targets: seaweed_4,
-            angle: { from: -4, to: 4 },
-            duration: 1700,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1, // Repeat infinitely
-        });
-        // Create Rocks Obstacle
-        const rockObstacle = this.add.image(400, 300, 'rockObstacle');
-        rockObstacle.setName('rockObstacle');
-        rockObstacle.setOrigin(0.5, 0.5);
-        rockObstacle.setCrop(0, 1, rockObstacle.width, rockObstacle.height - 1);
-        rockObstacle.setDepth(-1);
-        // Add a tween to scale the rock up and down
-        this.tweens.add({
-            targets: rockObstacle,
-            scale: { from: 0.8, to: 1.2 },
-            duration: 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut', // Smooth easing for the scale animation
-        });
+        // Rock Obstacle with animation
+        sceneManager.createRockObstacle('rockObstacle', 400, 300);
+        // Seaweeds at different positions
+        sceneManager.createAnimatedSeaweed('seaweed', 300, 500, 5, 3000, [0, 1], 1);
+        sceneManager.createAnimatedSeaweed('seaweed2', 500, 520, 6, 2500, [3, 1], 1);
+        sceneManager.createAnimatedSeaweed('seaweed3', 600, 540, 4, 4000, [-1, 1.5], 0.8);
         // Initialize the Plant Growth System
         this.plantGrowthSystem = new PlantGrowthComponent(this, 0, 0);
         this.plantGrowthSystem.changeState(PlantGrowthState.Seed);

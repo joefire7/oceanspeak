@@ -32,6 +32,7 @@ export class PlantGrowthComponent {
         // Add the initial plant image to the scene at the bottom-right corner
         this.plantImage = this.scene.add.image(0, 0, this.growthImages[this.growthState]);
         this.plantImage.setOrigin(1, 1); // Align origin to the bottom-right corner
+        this.plantImage.setCrop(0, 1, this.plantImage.width, this.plantImage.height - 1);
         this.plantImage.setScale(0.5); // Initial Scale
         this.updatePlantPosition();
     }
