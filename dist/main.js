@@ -31,6 +31,8 @@ class OceanSpeakGame extends Phaser.Scene {
         this.load.image('growth2', 'assets/growth2.png');
         this.load.image('growth3', 'assets/growth3.png');
         this.load.image('fullyGrown', 'assets/fullyGrown.png');
+        // Load Image for Rock obstacle
+        this.load.image('rockObstacle', 'assets/rockObstacle.png');
     }
     create() {
         // Add the water background
@@ -44,6 +46,7 @@ class OceanSpeakGame extends Phaser.Scene {
             color: '#000000',
         });
         this.fpsText.setDepth(1);
+        this.cameras.main.setRoundPixels(true);
         // Add the tiled sand texture at the bottom using TileSprite
         /*   const tileHeight = 128;
           const startY = this.cameras.main.height - tileHeight; // Position at the bottom */
@@ -94,6 +97,7 @@ class OceanSpeakGame extends Phaser.Scene {
         // Add the seaweed to the scene
         const seaweed_1 = this.add.image(400, 300, 'seaweed');
         seaweed_1.setOrigin(0.5, -0.5); // Set the origin at the bottom center to pivot correctly
+        seaweed_1.setCrop(0, 1, seaweed_1.width, seaweed_1.height - 1);
         seaweed_1.setScale(1); // Adjust scale if needed
         seaweed_1.setDepth(-1);
         // Create a waving animation using a tween
@@ -107,6 +111,7 @@ class OceanSpeakGame extends Phaser.Scene {
         });
         const seaweed_2 = this.add.image(400, 300, 'seaweed');
         seaweed_2.setOrigin(-1, -0.6); // Set the origin at the bottom center to pivot correctly
+        seaweed_2.setCrop(0, 1, seaweed_2.width, seaweed_2.height - 1);
         seaweed_2.setScale(1); // Adjust scale if needed
         seaweed_2.setDepth(-1);
         // Create a waving animation using a tween
@@ -120,6 +125,7 @@ class OceanSpeakGame extends Phaser.Scene {
         });
         const seaweed_3 = this.add.image(400, 300, 'seaweed2');
         seaweed_3.setOrigin(2, -1); // Set the origin at the bottom center to pivot correctly
+        seaweed_3.setCrop(0, 1, seaweed_3.width, seaweed_3.height - 1);
         seaweed_3.setScale(0.8); // Adjust scale if needed
         seaweed_3.setDepth(-1);
         // Create a waving animation using a tween
@@ -133,6 +139,7 @@ class OceanSpeakGame extends Phaser.Scene {
         });
         const seaweed_4 = this.add.image(400, 300, 'seaweed3');
         seaweed_4.setOrigin(3, -0.70); // Set the origin at the bottom center to pivot correctly
+        seaweed_4.setCrop(0, 1, seaweed_4.width, seaweed_4.height - 1);
         seaweed_4.setScale(1); // Adjust scale if needed
         seaweed_4.setDepth(-1);
         // Create a waving animation using a tween
@@ -143,6 +150,21 @@ class OceanSpeakGame extends Phaser.Scene {
             ease: 'Sine.easeInOut',
             yoyo: true,
             repeat: -1, // Repeat infinitely
+        });
+        // Create Rocks Obstacle
+        const rockObstacle = this.add.image(400, 300, 'rockObstacle');
+        rockObstacle.setName('rockObstacle');
+        rockObstacle.setOrigin(0.5, 0.5);
+        rockObstacle.setCrop(0, 1, rockObstacle.width, rockObstacle.height - 1);
+        rockObstacle.setDepth(-1);
+        // Add a tween to scale the rock up and down
+        this.tweens.add({
+            targets: rockObstacle,
+            scale: { from: 0.8, to: 1.2 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut', // Smooth easing for the scale animation
         });
         // Initialize the Plant Growth System
         this.plantGrowthSystem = new PlantGrowthComponent(this, 0, 0);
@@ -157,8 +179,15 @@ class OceanSpeakGame extends Phaser.Scene {
         // Animate smooth swimming for all fish
         this.fishGroup.children.iterate((fish) => {
             const fishSprite = fish;
-            const baseY = fishSprite.getData('baseY') || fishSprite.y; // Retrieve or default to current Y
-            fishSprite.y = baseY + Math.sin((this.time.now + fishSprite.x * 100) / 3000) * 10; // Smooth sine wave
+            // Skip sine wave logic if disabled
+            this.checkFishCollision(fishSprite);
+            if (fishSprite.getData('sineWaveDisabled') == 'true') {
+            }
+            else if (fishSprite.getData('sineWaveDisabled') == 'false') {
+                const baseY = fishSprite.getData('baseY') || fishSprite.y; // Retrieve or default to current Y
+                fishSprite.y = baseY + Math.sin((this.time.now + fishSprite.x * 100) / 3000) * 10; // Smooth sine wave
+                return true; // Explicitly return true to satisfy TypeScript
+            }
             return true; // Explicitly return true to satisfy TypeScript
         });
     }
@@ -176,7 +205,7 @@ class OceanSpeakGame extends Phaser.Scene {
             if (existingFish.has(fishName)) {
                 // Update position for existing fish
                 const fishSprite = existingFish.get(fishName);
-                fishSprite.setData('baseY', fishSprite.getData('baseY') || fishData.y); // Ensure baseY is set
+                fishSprite.setData('baseY', /*fishSprite.getData('baseY') ||*/ fishData.y); // Ensure baseY is set
                 fishSprite.setPosition(fishData.x, fishData.y);
                 existingFish.delete(fishName);
             }
@@ -250,25 +279,6 @@ class OceanSpeakGame extends Phaser.Scene {
             console.error('SpeechRecognition API is not supported in this browser.');
             return;
         }
-        // if (SpeechRecognition) {
-        //     const recognition = new SpeechRecognition();
-        //     navigator.languages.forEach((lang) => {
-        //         recognition.lang = lang;
-        //         console.log(`Testing language: ${lang}`);
-        //         recognition.onerror = (event) => {
-        //             if (event.error === 'language-not-supported') {
-        //                 console.log(`Language not supported: ${lang}`);
-        //             }
-        //         };
-        //         recognition.onstart = () => {
-        //             console.log(`Language supported: ${lang}`);
-        //             recognition.stop();
-        //         };
-        //         recognition.start();
-        //     });
-        // } else {
-        //     console.error('SpeechRecognition API is not supported in this browser.');
-        // }
         // Initialize SpeechRecognition
         this.speechRecognition = new SpeechRecognition();
         this.speechRecognition.continuous = true; // Keep listening continuously
@@ -280,7 +290,7 @@ class OceanSpeakGame extends Phaser.Scene {
         this.speechRecognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript.toLowerCase();
             console.log(`You said: ${transcript}`);
-            if (transcript.includes('grow')) {
+            if (transcript.includes('grow') || transcript.includes('go')) {
                 console.log('Grow command detected!');
                 this.growPlant(); // Trigger the plant growth system
             }
@@ -310,6 +320,55 @@ class OceanSpeakGame extends Phaser.Scene {
             console.log('Plant is fully grown!');
         }
     }
+    checkFishCollision(fish) {
+        // Example check the collision with Obstacle
+        const obstacle = this.children.getByName('rockObstacle');
+        if (obstacle && Phaser.Math.Distance.Between(fish.x, fish.y, obstacle.x, obstacle.y) < 100) {
+            console.log("Fish close to OBSTACLE, deciding avoidance direction.");
+            // Disable sine wave updates temporarily
+            fish.setData('sineWaveDisabled', true);
+            let targetY;
+            // Decide whether to move up or down
+            if (fish.y < obstacle.y) {
+                // Fish is above the obstacle, move up
+                targetY = Math.max(50, fish.y - 150); // Avoid moving beyond the top
+                console.log("Moving fish up to avoid obstacle.");
+            }
+            else {
+                // Fish is below the obstacle, move down
+                targetY = Math.min(this.cameras.main.height - 50, fish.y + 150); // Avoid moving beyond the bottom
+                console.log("Moving fish down to avoid obstacle.");
+            }
+            const targetX = fish.x + 150; // Move forward horizontally
+            // Smoothly move the fish to the target position
+            this.tweens.add({
+                targets: fish,
+                x: targetX,
+                y: targetY,
+                duration: 1000,
+                ease: 'Power2',
+                onUpdate: (tween, target) => {
+                    // Calculate and sync current Y position during tween
+                    const progress = tween.progress; // Progress of the tween (0 to 1)
+                    const currentY = Phaser.Math.Linear(fish.y, targetY, progress); // Linear interpolation
+                    fish.setData('baseY', currentY); // Update baseY during tween
+                },
+                onComplete: () => {
+                    // Ensure the sine wave logic starts from the new position
+                    fish.setData('baseY', targetY); // Finalize baseY after tween
+                    fish.setData('sineWaveDisabled', false); // Re-enable sine wave logic
+                    console.log(`Tween complete. Fish moved to (${targetX}, ${targetY}). BaseY set to: ${targetY}`);
+                    // Notify the server about the new position
+                    this.socket.send(JSON.stringify({
+                        type: 'updateFishPosition',
+                        id: parseInt(fish.name),
+                        x: targetX,
+                        y: targetY,
+                    }));
+                },
+            });
+        }
+    }
 }
 const config = {
     type: Phaser.AUTO,
@@ -323,7 +382,7 @@ const config = {
         },
     },
     scene: OceanSpeakGame,
-    pixelArt: true,
+    pixelArt: false,
     antialias: true, // Disable anti-aliasing
 };
 const game = new Phaser.Game(config);
