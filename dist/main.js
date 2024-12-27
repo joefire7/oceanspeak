@@ -108,6 +108,10 @@ class OceanSpeakGame extends Phaser.Scene {
         });
     }
     syncFish(fishes) {
+        if (!fishes || !Array.isArray(fishes)) {
+            console.error('Invalid fishes data:', fishes); // Debugging log
+            return; // Exit if `fishes` is not valid
+        }
         const existingFish = new Map();
         // Keep track of existing fish
         this.fishGroup.children.iterate((fish) => {
@@ -119,65 +123,70 @@ class OceanSpeakGame extends Phaser.Scene {
         fishes.forEach((fishData) => {
             const fishName = fishData.id.toString();
             if (existingFish.has(fishName)) {
-                // Update position for existing fish
                 const fishSprite = existingFish.get(fishName);
-                fishSprite.setData('baseY', /*fishSprite.getData('baseY') ||*/ fishData.y); // Ensure baseY is set
+                // Update position and sine wave data
                 fishSprite.setPosition(fishData.x, fishData.y);
+                fishSprite.setData('baseY', fishData.y); // Update baseY
+                fishSprite.setData('sineWavePhase', 0); // Reset sine wave phase
                 existingFish.delete(fishName);
             }
             else {
                 // Add new fish
-                const fish = this.fishGroup.create(fishData.x, fishData.y, 'fish').setInteractive();
+                const fish = this.fishGroup.create(fishData.x, fishData.y, 'fish');
                 fish.name = fishName;
                 fish.setScale(0.5);
-                fish.setData('baseY', fishData.y); // Set baseY for sine wave animation
+                fish.setData('baseY', fishData.y);
+                fish.setData('sineWavePhase', 0);
                 fish.on('pointerdown', (pointer) => {
-                    // Use current client-side position
-                    // const fishX = fish.x;
-                    // const fishY = fish.y;
                     fish.disableInteractive();
-                    this.tweens.add({
-                        targets: fish,
-                        scaleX: { from: 0.5, to: 1.2 },
-                        scaleY: { from: 0.5, to: 0.8 },
-                        duration: 100,
-                        yoyo: true,
-                        onYoyo: () => {
-                            this.tweens.add({
-                                targets: fish,
-                                scaleX: 0,
-                                scaleY: 0,
-                                alpha: 0,
-                                duration: 100,
-                                onComplete: () => {
-                                    // Use the pointer's x and y for the bubble effect
-                                    this.createBubbleEffect(pointer.x, pointer.y, pointer);
-                                    console.log("Pointer x: " + pointer.x + " " + "Pointer y: " + pointer.y);
-                                    fish.destroy();
-                                    this.socket.send(JSON.stringify({ type: 'fishDestroyed', id: parseInt(fish.name) }));
-                                },
-                            });
-                        },
-                    });
+                    this.destroyFish(fish, pointer);
                 });
             }
         });
         // Remove leftover fish
         existingFish.forEach((fish) => {
-            const fishSprite = fish;
-            console.log(`Removing fish and creating bubbles at (${fishSprite.x}, ${fishSprite.y})`); // Debugging log
-            //this.createBubbleEffect(fishSprite.x, fishSprite.y); // Create bubble effect before removing
-            this.fishGroup.remove(fishSprite, true, true);
+            this.fishGroup.remove(fish, true, true);
         });
+    }
+    destroyFish(fish, pointer) {
+        this.tweens.add({
+            targets: fish,
+            scaleX: { from: 0.5, to: 1.2 },
+            scaleY: { from: 0.5, to: 0.8 },
+            duration: 100,
+            yoyo: true,
+            onYoyo: () => {
+                this.tweens.add({
+                    targets: fish,
+                    scaleX: 0,
+                    scaleY: 0,
+                    alpha: 0,
+                    duration: 100,
+                    onComplete: () => {
+                        this.createBubbleEffect(pointer.x, pointer.y, pointer);
+                        fish.destroy();
+                        this.socket.send(JSON.stringify({ type: 'fishDestroyed', id: parseInt(fish.name) }));
+                    },
+                });
+            },
+        });
+    }
+    sendMoveCommand(fishId, targetX, targetY) {
+        this.socket.send(JSON.stringify({
+            type: 'moveFish',
+            id: fishId,
+            targetX: targetX,
+            targetY: targetY,
+        }));
     }
     createBubbleEffect(x, y, pointer) {
         const particles = this.add.particles(x, y, 'bubble', {
             x: pointer.deltaX,
             y: pointer.deltaY,
-            speed: { min: 50, max: 100 },
-            scale: { start: 2.5, end: 0 },
-            lifespan: 1000,
-            quantity: 20,
+            speed: { min: 50, max: 100 }, // Bubble speed
+            scale: { start: 2.5, end: 0 }, // Shrink bubbles as they move
+            lifespan: 1000, // Duration of bubbles
+            quantity: 20, // Number of bubbles per burst
             frequency: -1, // Emit all particles at once
         }); // Updated to pass position directly
         // Set the emitter's position to the fish's position
@@ -247,12 +256,19 @@ class OceanSpeakGame extends Phaser.Scene {
             // Decide whether to move up or down
             if (fish.y < obstacle.y) {
                 // Fish is above the obstacle, move up
-                targetY = Math.max(50, fish.y - 150); // Avoid moving beyond the top
+                const targetX = fish.x + 150;
+                targetY = fish.y < obstacle.y
+                    ? Math.max(50, fish.y - 150)
+                    : Math.min(this.cameras.main.height - 50, fish.y + 150);
+                fish.setData('isTweening', true);
+                this.sendMoveCommand(parseInt(fish.name), targetX, targetY);
                 console.log("Moving fish up to avoid obstacle.");
             }
             else {
                 // Fish is below the obstacle, move down
                 targetY = Math.min(this.cameras.main.height - 50, fish.y + 150); // Avoid moving beyond the bottom
+                const targetX = fish.x + 150;
+                this.sendMoveCommand(parseInt(fish.name), targetX, targetY);
                 console.log("Moving fish down to avoid obstacle.");
             }
             const targetX = fish.x + 150; // Move forward horizontally
@@ -277,7 +293,7 @@ class OceanSpeakGame extends Phaser.Scene {
                     // Notify the server about the new position
                     this.socket.send(JSON.stringify({
                         type: 'updateFishPosition',
-                        id: parseInt(fish.name),
+                        id: parseInt(fish.name), // Fish ID
                         x: targetX,
                         y: targetY,
                     }));
@@ -298,7 +314,7 @@ const config = {
         },
     },
     scene: OceanSpeakGame,
-    pixelArt: false,
+    pixelArt: false, // Enable pixel-perfect rendering
     antialias: true, // Disable anti-aliasing
 };
 const game = new Phaser.Game(config);

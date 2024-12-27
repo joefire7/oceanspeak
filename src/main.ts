@@ -21,7 +21,6 @@ class OceanSpeakGame extends Phaser.Scene {
     
     private speechRecognition!: SpeechRecognition;
 
-
     constructor() {
         super({ key: 'FishGame' });
     }
@@ -58,7 +57,6 @@ class OceanSpeakGame extends Phaser.Scene {
 
         this.cameras.main.setRoundPixels(true);
 
-      
         // Initialize the fish group
         this.fishGroup = this.physics.add.group();
         console.log('Fish group initialized.');
@@ -140,7 +138,12 @@ class OceanSpeakGame extends Phaser.Scene {
         });
     }
 
-    private syncFish(fishes: { id: number; x: number; y: number }[]): void {
+    private syncFish(fishes: { id: number; x: number; y: number }[] | undefined): void {
+        if (!fishes || !Array.isArray(fishes)) {
+            console.error('Invalid fishes data:', fishes); // Debugging log
+            return; // Exit if `fishes` is not valid
+        }
+    
         const existingFish = new Map<string, Phaser.Physics.Arcade.Sprite>();
     
         // Keep track of existing fish
@@ -154,60 +157,76 @@ class OceanSpeakGame extends Phaser.Scene {
         fishes.forEach((fishData) => {
             const fishName = fishData.id.toString();
             if (existingFish.has(fishName)) {
-                // Update position for existing fish
                 const fishSprite = existingFish.get(fishName) as Phaser.Physics.Arcade.Sprite;
-                fishSprite.setData('baseY', /*fishSprite.getData('baseY') ||*/ fishData.y); // Ensure baseY is set
+                
+                // Update position and sine wave data
                 fishSprite.setPosition(fishData.x, fishData.y);
+                fishSprite.setData('baseY', fishData.y); // Update baseY
+                fishSprite.setData('sineWavePhase', 0);  // Reset sine wave phase
+                
                 existingFish.delete(fishName);
             } else {
                 // Add new fish
-                const fish = this.fishGroup.create(fishData.x, fishData.y, 'fish').setInteractive();
+                const fish = this.fishGroup.create(fishData.x, fishData.y, 'fish');
+                fish.setInteractive();
                 fish.name = fishName;
                 fish.setScale(0.5);
-                fish.setData('baseY', fishData.y); // Set baseY for sine wave animation
+                fish.setData('baseY', fishData.y);
+                fish.setData('sineWavePhase', 0);
     
                 fish.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-                    // Use current client-side position
-                    // const fishX = fish.x;
-                    // const fishY = fish.y;
                     fish.disableInteractive();
-    
-                    this.tweens.add({
-                        targets: fish,
-                        scaleX: { from: 0.5, to: 1.2 },
-                        scaleY: { from: 0.5, to: 0.8 },
-                        duration: 100,
-                        yoyo: true,
-                        onYoyo: () => {
-                            this.tweens.add({
-                                targets: fish,
-                                scaleX: 0,
-                                scaleY: 0,
-                                alpha: 0,
-                                duration: 100,
-                                onComplete: () => {
-                                    // Use the pointer's x and y for the bubble effect
-                                    this.createBubbleEffect(pointer.x, pointer.y, pointer);
-                                    console.log("Pointer x: " + pointer.x + " " + "Pointer y: " + pointer.y)
-                                    fish.destroy();
-                                    this.socket.send(JSON.stringify({ type: 'fishDestroyed', id: parseInt(fish.name) }));
-                                },
-                            });
-                        },
-                    });
+                    this.destroyFish(fish, pointer);
                 });
             }
         });
     
         // Remove leftover fish
         existingFish.forEach((fish) => {
-            const fishSprite = fish as Phaser.Physics.Arcade.Sprite;
-            console.log(`Removing fish and creating bubbles at (${fishSprite.x}, ${fishSprite.y})`); // Debugging log
-            //this.createBubbleEffect(fishSprite.x, fishSprite.y); // Create bubble effect before removing
-            this.fishGroup.remove(fishSprite, true, true);
+            this.fishGroup.remove(fish, true, true);
         });
     }
     
+    private destroyFish(fish: Phaser.Physics.Arcade.Sprite, pointer: Phaser.Input.Pointer): void {
+        this.tweens.add({
+            targets: fish,
+            scaleX: { from: 0.5, to: 1.2 },
+            scaleY: { from: 0.5, to: 0.8 },
+            duration: 100,
+            yoyo: true,
+            onYoyo: () => {
+                this.tweens.add({
+                    targets: fish,
+                    scaleX: 0,
+                    scaleY: 0,
+                    alpha: 0,
+                    duration: 100,
+                    onComplete: () => {
+                        this.createBubbleEffect(pointer.x, pointer.y, pointer);
+                        fish.destroy();
+                        this.socket.send(
+                            JSON.stringify({ type: 'fishDestroyed', id: parseInt(fish.name) })
+                        );
+                    },
+                });
+            },
+        });
+    }
+    
+
+    private sendMoveCommand(fishId: number, targetX: number, targetY: number): void {
+        this.socket.send(
+            JSON.stringify({
+                type: 'moveFish',
+                id: fishId,
+                targetX: targetX,
+                targetY: targetY,
+            })
+        );
+    }
+
+    
+    // Set the emitter's position to the fish's position
     private createBubbleEffect(x: number, y: number, pointer: Phaser.Input.Pointer): void {
         const particles = this.add.particles(x, y, 'bubble', {
             x: pointer.deltaX,
@@ -219,8 +238,6 @@ class OceanSpeakGame extends Phaser.Scene {
             frequency: -1, // Emit all particles at once
         }); // Updated to pass position directly
 
-        // Set the emitter's position to the fish's position
-        //particles.setPosition(x,y);
         // Trigger the burst effect
         particles.explode(10, pointer.deltaX, pointer.deltaY);
 
@@ -246,11 +263,11 @@ class OceanSpeakGame extends Phaser.Scene {
         this.speechRecognition.lang = 'en'; // Set to English (United States)
 
 
-    // Start the recognition process
-    this.speechRecognition.start();
+        // Start the recognition process
+        this.speechRecognition.start();
 
-    // Handle the result event
-    this.speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
+        // Handle the result event
+        this.speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript.toLowerCase();
         console.log(`You said: ${transcript}`);
 
@@ -275,7 +292,6 @@ class OceanSpeakGame extends Phaser.Scene {
         this.speechRecognition.start();
     };
         
-
     }
 
     private growPlant(): void {
@@ -304,11 +320,18 @@ class OceanSpeakGame extends Phaser.Scene {
             // Decide whether to move up or down
             if (fish.y < obstacle.y) {
                 // Fish is above the obstacle, move up
-                targetY = Math.max(50, fish.y - 150); // Avoid moving beyond the top
+                const targetX = fish.x + 150;
+                targetY = fish.y < obstacle.y
+                ? Math.max(50, fish.y - 150)
+                : Math.min(this.cameras.main.height - 50, fish.y + 150);
+                fish.setData('isTweening', true);
+                this.sendMoveCommand(parseInt(fish.name), targetX, targetY);
                 console.log("Moving fish up to avoid obstacle.");
             } else {
                 // Fish is below the obstacle, move down
                 targetY = Math.min(this.cameras.main.height - 50, fish.y + 150); // Avoid moving beyond the bottom
+                const targetX = fish.x + 150;
+                this.sendMoveCommand(parseInt(fish.name), targetX, targetY);
                 console.log("Moving fish down to avoid obstacle.");
             }
     
@@ -342,8 +365,6 @@ class OceanSpeakGame extends Phaser.Scene {
                     }));
                 },
             });
-            
-            
         }
     }
 }

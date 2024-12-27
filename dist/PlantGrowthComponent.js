@@ -44,15 +44,15 @@ export class PlantGrowthComponent {
             targets: this.plantImage,
             scaleX: newScale,
             scaleY: newScale,
-            duration: 500,
+            duration: 500, // Smooth transition
             ease: 'Power2',
         });
         this.scene.tweens.add({
             targets: this.plantImage,
-            angle: { from: -2, to: 2 },
-            duration: 1700,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
+            angle: { from: -2, to: 2 }, // Oscillate the angle for the sway effect
+            duration: 1700, // Time for a complete wave (in ms)
+            ease: 'Sine.easeInOut', // Smooth wave motion
+            yoyo: true, // Reverse the animation back and forth
             repeat: -1, // Repeat infinitely
         });
     }
